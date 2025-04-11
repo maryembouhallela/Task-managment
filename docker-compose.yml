@@ -1,0 +1,59 @@
+services:
+  # Service MySQL (Database)
+  mysql:
+    image: mysql:8.0  # Use the official MySQL image version 8.0
+    container_name: mysql_db  # Container name for MySQL
+    restart: always  # Automatically restart the container if it stops
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password  # Root password
+      MYSQL_DATABASE: my_database  # Database to create on startup
+      MYSQL_USER: mysql  # MySQL user
+      MYSQL_PASSWORD: my_password  # MySQL user password
+    ports:
+      - "3306:3306"  # Expose MySQL on port 3306 of the host
+    volumes:
+      - mysql_data:/var/lib/mysql  # Persist MySQL data
+    networks:
+      - app_network  # Connect MySQL to the internal network
+
+  # Service Backend (NestJS)
+  backend:
+    build: ./backend  # Path to the Dockerfile for the backend
+    image: sondes98/task-management-backend
+    container_name: nestjs_backend  # Container name for the backend
+    restart: always  # Automatically restart the container if it stops
+    depends_on:
+      - mysql  # Ensure MySQL starts before the backend
+    entrypoint: ["/bin/sh", "-c", "until nc -z mysql 3306; do echo 'Waiting for MySQL...'; sleep 2; done; npm run start:dev"]    
+    environment:
+      DB_HOST: mysql  # MySQL service name (used in Docker Compose networking)
+      DB_PORT: 3306  # MySQL port
+      DB_USER: mysql  # MySQL user
+      DB_PASSWORD: my_password  # MySQL password
+      DB_NAME: my_database  # Database used by the app
+    ports:
+      - "5000:5000"  # Expose the API on port 5000 of the container, map it to 5000 of the host
+    networks:
+      - app_network  # Connect backend to the internal network
+
+  # Service Frontend (React)
+  frontend:
+    build: ./frontend  # Path to the Dockerfile for the frontend
+    image: sondes98/task-management-frontend
+    container_name: react_frontend  # Container name for the frontend
+    restart: always  # Automatically restart the container if it stops
+    depends_on:
+      - backend  # Ensure backend starts before frontend
+    ports:
+      - "5173:5173"  # Expose frontend on port 5173 of the host
+    networks:
+      - app_network  # Connect frontend to the internal network
+
+# Volumes for persistent data
+volumes:
+  mysql_data:  # Persistent volume to store MySQL data
+
+# Network definition for service communication
+networks:
+  app_network:
+    driver: bridge  # Isolated network for services to communicate
